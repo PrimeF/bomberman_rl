@@ -3,4 +3,5 @@ pygame==2.0.1
 tqdm==4.58.0
 tensorboardX==2.1
 tensorboard==2.4.1
+pathfinding==1.0.1
 

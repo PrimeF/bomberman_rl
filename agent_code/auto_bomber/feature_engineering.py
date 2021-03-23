@@ -1,5 +1,8 @@
 import numpy as np
 from scipy.special import softmax
+from pathfinding.core.diagonal_movement import DiagonalMovement
+from pathfinding.core.grid import Grid
+from pathfinding.finder.a_star import AStarFinder
 
 
 def state_to_features(game_state: dict, weight_opponents_no_bomb=0.0) -> np.array:
@@ -141,6 +144,10 @@ def _compute_zones_heatmap(agent_position, objects_position, initial, weighting_
 
     if objects_position.size == 0:
         return zones
+
+    matrix = np.zeros(10)
+    matrix[objects_position] = 1
+    print(objects_position)
 
     distances = np.linalg.norm(agent_position - objects_position, axis=1)
     if weighting_func:
