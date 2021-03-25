@@ -1,5 +1,8 @@
 import numpy as np
 from scipy.special import softmax
+# from pathfinding.core.diagonal_movement import DiagonalMovement
+from pathfinding.core.grid import Grid
+from pathfinding.finder.dijkstra import DijkstraFinder
 
 
 def state_to_features(game_state: dict, weight_opponents_no_bomb=0.0) -> np.array:
@@ -46,27 +49,35 @@ def state_to_features(game_state: dict, weight_opponents_no_bomb=0.0) -> np.arra
     # TODO HUUUUUUUUUGE!!!!!!! --> Switch distances from euclidean to a path finding algorithm
     # https://pypi.org/project/pathfinding/
 
+    field = game_state['field']
+    field = np.where(field == 0, 1, field)
+    if bombs_position.size != 0:
+        field[bombs_position[:, 0], bombs_position[:, 1]] = -1
+
+    grid = Grid(matrix=field)
+    finder = DijkstraFinder()
+
     # TODO Make BOMB_POWER dynamic from settings.py
-    bombs_zones = _compute_zones_heatmap(agent_position, bombs_position, 0.0,
+    bombs_zones = _compute_zones_heatmap(agent_position, bombs_position, grid, finder, 0.0,
                                          lambda v, w: np.where(v > 0., v[(3 + w) - v >= 0] ** w[(3 + w) - v >= 0], 0.0),
                                          bombs_countdown,
                                          lambda v: np.mean(v[v != 0.0]) if v[v != 0.0].size != 0 else 0.0,
                                          lambda v: -1 * np.divide(1, v, out=np.zeros_like(v), where=v != 0))
 
     # TODO Does not account for how many coins there are in the zone
-    coins_zones = _compute_zones_heatmap(agent_position, relevant_coins_position, 0.0,
+    coins_zones = _compute_zones_heatmap(agent_position, relevant_coins_position, grid, finder, 0.0,
                                          # aggregation_func=lambda v: np.mean(v[v != 0.0]) if v[v != 0.0].size != 0 else 0.0,
                                          aggregation_func=lambda v: np.mean(v) if v.size != 0 else 0.0,
                                          # normalization_func=lambda v: softmax(
                                          #     np.divide(1, v, out=np.full_like(v, -np.inf), where=v != 0)) if np.all(
                                          #     v != 0.0) else v)
                                          normalization_func=lambda v: np.divide(1, v, out=np.zeros_like(v), where=v != 0))
-    crates_zones = _compute_zones_heatmap(agent_position, crates_position, 0.0,
+    crates_zones = _compute_zones_heatmap(agent_position, crates_position, grid, finder, 0.0,
                                           aggregation_func=lambda v: np.mean(v) if v.size != 0 else 0.0,
                                           # normalization_func=lambda v: softmax(
                                           #     np.divide(1, v, out=np.full_like(v, -np.inf), where=v != 0)))
                                           normalization_func=lambda v: np.divide(1, v, out=np.zeros_like(v), where=v != 0))
-    # opponents_zones = _compute_zones_heatmap(agent_position, opponents_position, 0.0, lambda v, w: v * w,
+    # opponents_zones = _compute_zones_heatmap(agent_position, opponents_position, grid, finder, 0.0, lambda v, w: v * w,
     #                                          opponents_bomb_action,
     #                                          lambda v: np.sum(v),
     #                                          lambda v: np.divide(v, np.max(v), out=np.zeros_like(v), where=v != 0))
@@ -129,7 +140,7 @@ def state_to_features(game_state: dict, weight_opponents_no_bomb=0.0) -> np.arra
     return features
 
 
-def _compute_zones_heatmap(agent_position, objects_position, initial, weighting_func=None, weights=None,
+def _compute_zones_heatmap(agent_position, objects_position, grid, finder, initial, weighting_func=None, weights=None,
                            aggregation_func=None, normalization_func=None):
     """
     Computes the distance of given objects from the agent and determines their position relative to the agent.
@@ -162,8 +173,15 @@ def _compute_zones_heatmap(agent_position, objects_position, initial, weighting_
 
     if objects_position.size == 0:
         return zones
+    distances = np.zeros(shape=(len(objects_position)))
+    for i, object_position in enumerate(objects_position):
+        start = grid.node(agent_position[0], agent_position[1])
+        end = grid.node(object_position[0], object_position[1])
+        path, _ = finder.find_path(start, end, grid)
+        grid.cleanup()
+        distances[i] = len(path)
 
-    distances = np.linalg.norm(agent_position - objects_position, axis=1)
+    # distances = np.linalg.norm(agent_position - objects_position, axis=1)
     if weighting_func:
         distances = weighting_func(distances, weights)
     angles = np.degrees(
