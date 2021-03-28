@@ -36,6 +36,7 @@ def state_to_features(game_state: dict, weight_opponents_no_bomb=0.0) -> np.arra
     agent_position = np.asarray(game_state['self'][3], dtype='int')
     agent_bomb_action = np.asarray(game_state['self'][2], dtype='int')
     bombs_position = np.atleast_2d(np.asarray([list(bomb[0]) for bomb in game_state['bombs']], dtype='int'))
+    print('bombs: ', len(bombs_position))
     bombs_countdown = np.asarray([bomb[1] for bomb in game_state['bombs']])
     explosions_position = np.argwhere(game_state['explosion_map'] > 0)
     coins_position = np.atleast_2d(np.array(game_state['coins'], dtype='int'))
@@ -46,10 +47,8 @@ def state_to_features(game_state: dict, weight_opponents_no_bomb=0.0) -> np.arra
     # opponents_bomb_action = np.asarray([player[2] for player in game_state['others']])
     # opponents_bomb_action = np.where(opponents_bomb_action, 1.0, weight_opponents_no_bomb)
 
-    # TODO HUUUUUUUUUGE!!!!!!! --> Switch distances from euclidean to a path finding algorithm
-    # https://pypi.org/project/pathfinding/
-
     field = game_state['field']
+    field = np.where(field == 1, -1, field)
     field = np.where(field == 0, 1, field)
     if bombs_position.size != 0:
         field[bombs_position[:, 0], bombs_position[:, 1]] = -1
